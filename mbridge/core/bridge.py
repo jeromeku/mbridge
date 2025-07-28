@@ -196,7 +196,7 @@ class Bridge(ABC):
                 param_to_load = torch.empty_like(param)
                 # param_to_load = param.new_empty(size=param.size(), device=device)
                 device = device or param.device
-                
+
                 if ".mlp.experts.linear_fc" in local_name:
                     # split mcore weights across etp
                     if self.mpu.etp_rank == 0:
@@ -237,6 +237,7 @@ class Bridge(ABC):
                 # load
                 rank = dist.get_rank()
 
+                dist_print(f"MBRIDGE::{local_name=} {param.shape=} {param_to_load.shape=}")
               #  dist_print("DEBUG", local_name, param_to_load.view(-1)[:10].tolist())    
                 param.copy_(param_to_load)
 
