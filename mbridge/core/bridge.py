@@ -133,6 +133,7 @@ class Bridge(ABC):
         models: list[torch.nn.Module],
         weights_path: str,
         memory_efficient: bool = False,
+        device: bool = "cpu"
     ) -> None:
         """
         Load weights from a Hugging Face model into a Megatron-Core model.
@@ -201,7 +202,7 @@ class Bridge(ABC):
                         )
                         mcore_weights_tp_split = list(mcore_weights_tp_split)
                         mcore_weights_tp_split = [
-                            t.to(param.device) for t in mcore_weights_tp_split
+                            t.to(device) for t in mcore_weights_tp_split
                         ]
                     else:
                         mcore_weights_tp_split = None
@@ -219,10 +220,11 @@ class Bridge(ABC):
                         )
                         mcore_weights_tp_split = list(mcore_weights_tp_split)
                         mcore_weights_tp_split = [
-                            t.to(param.device) for t in mcore_weights_tp_split
+                            t.to(device) for t in mcore_weights_tp_split
                         ]
                     else:
                         mcore_weights_tp_split = None
+
                     torch.distributed.scatter(
                         param_to_load,
                         mcore_weights_tp_split,
@@ -230,6 +232,9 @@ class Bridge(ABC):
                         group=self.mpu.tp_group,
                     )
                 # load
+                rank = dist.get_rank()
+
+                dist_print("DEBUG", local_name, param_to_load.view(-1)[:10].tolist())    
                 param.copy_(param_to_load)
 
     def save_weights(
@@ -877,3 +882,22 @@ def register_model(model_types):
         return cls
 
     return decorator
+
+import time
+
+import torch.distributed as dist
+
+
+def dist_print(*msg, delay: int = 1, rank0_only: bool = False):
+    
+    if dist.is_initialized():
+        rank = dist.get_rank()
+        if rank0_only and rank != 0:
+            return
+        time.sleep(rank * delay)
+    print(f"{rank=}:", *msg, flush=True)
+
+def dist_breakpoint(rank: int = 0):
+    if dist.is_initialized() and rank == dist.get_rank():
+        breakpoint()
+    dist.barrier()
