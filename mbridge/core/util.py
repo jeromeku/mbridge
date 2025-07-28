@@ -6,9 +6,8 @@ from collections import defaultdict
 from functools import lru_cache
 
 import torch
-from megatron.core import mpu
+from megatron.core import mpu, tensor_parallel
 from megatron.core import parallel_state as mpu
-from megatron.core import tensor_parallel
 from megatron.core.fp8_utils import correct_amax_history_if_needed
 from megatron.core.models.gpt.gpt_model import ModelType
 from megatron.core.transformer.module import Float16Module
@@ -130,10 +129,11 @@ def get_model(
     # GPU allocation.
     # For FSDP2, we don't allocate GPU memory here. We allocate GPU memory
     # in the fully_shard function of FSDP2 instead.
-    if (
-        not (use_torch_fsdp2 and use_cpu_initialization)
-        and not init_model_with_meta_device
-    ):
+    
+    move_to_cuda = not (use_torch_fsdp2 and use_cpu_initialization) and not init_model_with_meta_device# and not use_cpu_initialization
+    print(f"DEBUG::{move_to_cuda=}")
+    
+    if move_to_cuda:
         for model_module in model:
             model_module.cuda(torch.cuda.current_device())
 
